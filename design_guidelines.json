@@ -1,0 +1,169 @@
+{
+  "app_name": "Twin IQ",
+  "personality": "1 iOS-Native Clean structure with 6 Glass / Luxe surfaces",
+  "personality_one_liner": "An intelligent, Apple-inspired gamified mentor that blends premium glass aesthetics with friendly, engaging progression mechanics.",
+  "color": {
+    "surface": { "light": "#FFFFFF", "dark": "#0B0C10" },
+    "onSurface": { "light": "#0F1115", "dark": "#F8FAFC" },
+    "surfaceSecondary": { "light": "#F1F5F9", "dark": "#161821" },
+    "onSurfaceSecondary": { "light": "#334155", "dark": "#CBD5E1" },
+    "surfaceTertiary": { "light": "#E2E8F0", "dark": "#202330" },
+    "onSurfaceTertiary": { "light": "#475569", "dark": "#94A3B8" },
+    "surfaceInverse": { "light": "#0B0C10", "dark": "#FFFFFF" },
+    "onSurfaceInverse": { "light": "#F8FAFC", "dark": "#0F1115" },
+    "brand": { "light": "#6366F1", "dark": "#818CF8" },
+    "brandPrimary": { "light": "#7C3AED", "dark": "#A78BFA" },
+    "onBrandPrimary": { "light": "#FFFFFF", "dark": "#FFFFFF" },
+    "brandSecondary": { "light": "#3B82F6", "dark": "#60A5FA" },
+    "onBrandSecondary": { "light": "#FFFFFF", "dark": "#FFFFFF" },
+    "brandTertiary": { "light": "#EDE9FE", "dark": "#3B2669" },
+    "onBrandTertiary": { "light": "#5B21B6", "dark": "#DDD6FE" },
+    "success": { "light": "#10B981", "dark": "#059669" },
+    "onSuccess": { "light": "#FFFFFF", "dark": "#FFFFFF" },
+    "warning": { "light": "#F59E0B", "dark": "#D97706" },
+    "onWarning": { "light": "#FFFFFF", "dark": "#FFFFFF" },
+    "error": { "light": "#EF4444", "dark": "#DC2626" },
+    "onError": { "light": "#FFFFFF", "dark": "#FFFFFF" },
+    "info": { "light": "#0EA5E9", "dark": "#0284C7" },
+    "onInfo": { "light": "#FFFFFF", "dark": "#FFFFFF" },
+    "border": { "light": "#E2E8F0", "dark": "#2A2D3D" },
+    "borderStrong": { "light": "#CBD5E1", "dark": "#3F445B" },
+    "divider": { "light": "#F1F5F9", "dark": "#1E212E" }
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Geist",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous Apple-inspired vertical rhythm. Content should breathe. Cards must not touch screen edges. Use consistent 16pt (lg) or 24pt (xl) padding for screen roots.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use semi-transparent (8-15% opacity) frosted-glass panels over dark or gradient backgrounds",
+      "Apply 1px rgba(255,255,255,0.15) subtle borders to define glass cards",
+      "Limit glass layers to 1-2 per screen (e.g., bottom tab bar and hero card)",
+      "Ensure text on glass uses high contrast (onSurfaceInverse or solid white) and passes WCAG AA"
+    ],
+    "dont's": [
+      "Do not apply glass to everything; reading areas and standard list rows should be solid for accessibility",
+      "Do not stack more than two blur layers to prevent GPU strain",
+      "Do not use glass for text inputs"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Conversational AI Onboarding",
+      "purpose": "A contextual, adaptive chat that collects user goals through slot-filling without feeling like a form.",
+      "states": {
+        "loading": "Typing indicator (three bouncing dots) in a chat bubble",
+        "empty": "AI greeting message with 3 suggested goal chips",
+        "error": "Inline fallback message 'Let's try that again.'"
+      },
+      "layout": "Bottom-heavy chat interface. Top header minimal (just a 'Skip' button). AI messages align left, user messages right. Heavy use of Quick Reply chips (tap-ready options) below the AI bubble to minimize typing. Dark/Light mode contrasting chat bubbles. The text input rests just above the keyboard with a glassmorphism pill shape."
+    },
+    {
+      "name": "Dashboard",
+      "purpose": "The student's command center combining daily missions, streak mechanics, and AI motivation.",
+      "states": {
+        "loading": "Skeleton loader matching the layout of hero card and mission list",
+        "empty": "Glass hero card with an illustration, prompting 'Start your first mission.'",
+        "error": "Card displaying 'Could not load today's plan' with a Retry button."
+      },
+      "layout": "Header contains User avatar and current Level/Streak badge. Below header: a premium Glassmorphism Hero Card overlaid on an abstract gradient background displaying the AI's motivational message and current focus score. Underneath: 2-column grid of 'Missions' or a vertical list with Duolingo-style rounded cards. Tab bar at the bottom uses a frosted glass effect."
+    },
+    {
+      "name": "AI Coach Chat",
+      "purpose": "A continuous mentoring dialogue space with streaming responses and inline action cards.",
+      "states": {
+        "loading": "Centered spinner for history, pulsing text for streaming responses.",
+        "empty": "Blank canvas with 4 'Conversation Starter' chips.",
+        "error": "Toast alert indicating connection lost."
+      },
+      "layout": "Standard full-screen chat but heavily stylized. AI messages can render rich components (Markdown, mini-charts, or roadmap nodes) inline, not just text. Input area is sticky at the bottom with an animated gradient 'Send/Record' button."
+    },
+    {
+      "name": "Adaptive Roadmap",
+      "purpose": "Visualizes long-term and daily plans as a continuous, gamified journey.",
+      "states": {
+        "loading": "Faded timeline nodes loading sequentially.",
+        "empty": "Illustration of a map with 'Let's plot your success path' CTA.",
+        "error": "Error state overlay with retry button."
+      },
+      "layout": "Vertical scrolling timeline. Nodes alternate left/right, similar to an Apple Maps route or Duolingo path. Completed nodes have filled gradient circles; upcoming nodes are outlined. Section headers for Months/Weeks use a subtle glassmorphism sticky header as the user scrolls."
+    },
+    {
+      "name": "Reports & Gamification",
+      "purpose": "Showcases XP, badges, and productivity metrics via beautiful charts.",
+      "states": {
+        "loading": "Skeleton of charts and badge grids.",
+        "empty": "Empty placeholder 'Complete missions to earn badges!'",
+        "error": "Error card with a retry fetch action."
+      },
+      "layout": "Top section features a large Circular Progress ring (Apple Fitness style) for XP. Below: A 2-column grid displaying unlocked achievements/badges inside brandTertiary tinted containers. Bottom section: Beautiful smooth line charts (using Reanimated) showing productivity and focus scores over the week."
+    }
+  ],
+  "images": {
+    "dashboard_hero_bg": {
+      "url": "https://images.unsplash.com/photo-1557683316-973673baf926?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGJsdWUlMjBwdXJwbGUlMjBncmFkaWVudHxlbnwwfHx8fDE3ODQxOTA2NTR8MA&ixlib=rb-4.1.0&q=85",
+      "dark": "https://images.unsplash.com/photo-1709626011485-6fe000ea2dbc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwxfHwzZCUyMGdlb21ldHJpYyUyMGdsYXNzJTIwc2hhcGV8ZW58MHx8fHwxNzg0MTkwNjU0fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Abstract blue and purple gradient background for hero card"
+    },
+    "onboarding_bg": {
+      "url": "https://images.unsplash.com/photo-1679193559811-b3a3a6353230?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGJsdWUlMjBwdXJwbGUlMjBncmFkaWVudHxlbnwwfHx8fDE3ODQxOTA2NTR8MA&ixlib=rb-4.1.0&q=85",
+      "dark": "https://images.unsplash.com/photo-1524169358666-79f22534bc6e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwyfHwzZCUyMGdlb21ldHJpYyUyMGdsYXNzJTIwc2hhcGV8ZW58MHx8fHwxNzg0MTkwNjU0fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Soft abstract blurred shapes"
+    }
+  },
+  "haptics": {
+    "primary_button_press": "impactLight",
+    "send_message": "impactMedium",
+    "complete_mission": "notificationSuccess",
+    "tab_change": "selection",
+    "achievement_unlocked": "notificationSuccess"
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color palette! The user specifically requested Blue and Purple. Utilize `brandPrimary` (Purple) and `brandSecondary` (Blue) for gradients.",
+    "Implement Glassmorphism 2.0 (12-20px blur, 8-15% transparency, 1px subtle white borders). Use `expo-blur` heavily on the Tab Bar, sticky headers, and the main Dashboard Hero Card, but keep readable areas solid.",
+    "For the Hero Card, place the abstract gradient image as a background (`expo-image` at base layer) and overlay the glass panel. Ensure text legibility via a dark scrim or solid typography.",
+    "The Onboarding should use a Conversational AI pattern. Implement 'Quick Reply' chips (horizontal ScrollView of tap-ready options) below the AI's chat bubble to reduce typing.",
+    "For Gamification (Dashboard and Reports), implement rounded Duolingo-style cards (`lg` or `pill` radius) with subtle shadows (shadow_tier 1) and bold, thick progress rings.",
+    "Use `Plus Jakarta Sans` for titles and bold numbers (XP, Level), and `Geist` for body text and chat bubbles.",
+    "Always wrap scrollable content with sticky actions safely above the home indicator. Provide bottom padding equivalent to the sticky CTA height + margin."
+  ]
+}
