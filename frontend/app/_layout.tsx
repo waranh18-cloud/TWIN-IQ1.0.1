@@ -29,6 +29,7 @@ export default function RootLayout() {
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="checkin" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+            <Stack.Screen name="pomodoro" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
           </Stack>
         </AuthProvider>
       </SafeAreaProvider>

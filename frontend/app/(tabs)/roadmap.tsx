@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Calendar from "expo-calendar";
+import * as Haptics from "expo-haptics";
 import { api } from "@/src/api";
 import { usePalette, spacing, radius, gradients } from "@/src/theme";
 
@@ -12,6 +14,8 @@ export default function Roadmap() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [regen, setRegen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const load = async () => {
     try {
@@ -29,6 +33,65 @@ export default function Roadmap() {
     setRegen(false);
   };
 
+  const syncToCalendar = async () => {
+    if (!data?.daily_missions?.length || syncing) return;
+    setSyncing(true);
+    setSyncStatus(null);
+    try {
+      if (Platform.OS === "web") {
+        setSyncStatus("Calendar sync is only available on mobile devices.");
+        setSyncing(false);
+        return;
+      }
+      const { status } = await Calendar.requestCalendarPermissionsAsync();
+      if (status !== "granted") {
+        setSyncStatus("Calendar permission was not granted. Enable it in settings to sync.");
+        setSyncing(false);
+        return;
+      }
+
+      // Find a writable calendar
+      const cals = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+      const target =
+        cals.find((cc: any) => cc.allowsModifications && cc.source?.name === "Default") ||
+        cals.find((cc: any) => cc.allowsModifications && cc.isPrimary) ||
+        cals.find((cc: any) => cc.allowsModifications);
+      if (!target) {
+        setSyncStatus("No writable calendar found on this device.");
+        setSyncing(false);
+        return;
+      }
+
+      const timeMap: Record<string, [number, number]> = {
+        morning: [8, 30], afternoon: [14, 0], evening: [19, 0],
+      };
+      const today = new Date();
+      let added = 0;
+      for (const m of data.daily_missions) {
+        const [h, mm] = timeMap[m.time_of_day] || [10, 0];
+        const start = new Date(today);
+        start.setHours(h, mm, 0, 0);
+        const end = new Date(start.getTime() + (m.duration_min || 30) * 60000);
+        try {
+          await Calendar.createEventAsync(target.id, {
+            title: `Twin IQ · ${m.title}`,
+            startDate: start,
+            endDate: end,
+            notes: `${m.category} · +${m.xp} XP`,
+            alarms: [{ relativeOffset: -10 }],
+          });
+          added++;
+        } catch {}
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSyncStatus(`Added ${added} of ${data.daily_missions.length} missions to your calendar.`);
+    } catch (e: any) {
+      setSyncStatus(`Sync failed: ${e.message || "unknown"}`);
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncStatus(null), 6000);
+  };
+
   if (loading) return <View style={[styles.center, { backgroundColor: c.surface }]}><ActivityIndicator color={c.brandPrimary} /></View>;
 
   return (
@@ -36,12 +99,27 @@ export default function Roadmap() {
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: c.onSurface }]}>Your Roadmap</Text>
-          <Pressable onPress={regenerate} disabled={regen} testID="regen-roadmap"
-            style={[styles.regenBtn, { backgroundColor: c.surfaceSecondary, borderColor: c.border }]}>
-            {regen ? <ActivityIndicator size="small" color={c.brandPrimary} /> :
-              <Ionicons name="refresh" size={16} color={c.brandPrimary} />}
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable onPress={syncToCalendar} disabled={syncing || !data?.daily_missions?.length}
+              testID="sync-calendar"
+              style={[styles.regenBtn, { backgroundColor: c.surfaceSecondary, borderColor: c.border, opacity: (!data?.daily_missions?.length) ? 0.4 : 1 }]}>
+              {syncing ? <ActivityIndicator size="small" color={c.brandSecondary} /> :
+                <Ionicons name="calendar" size={16} color={c.brandSecondary} />}
+            </Pressable>
+            <Pressable onPress={regenerate} disabled={regen} testID="regen-roadmap"
+              style={[styles.regenBtn, { backgroundColor: c.surfaceSecondary, borderColor: c.border }]}>
+              {regen ? <ActivityIndicator size="small" color={c.brandPrimary} /> :
+                <Ionicons name="refresh" size={16} color={c.brandPrimary} />}
+            </Pressable>
+          </View>
         </View>
+
+        {syncStatus && (
+          <View style={[styles.syncToast, { backgroundColor: c.brandTertiary, borderColor: c.brandPrimary }]} testID="sync-toast">
+            <Ionicons name="checkmark-circle" size={16} color={c.onBrandTertiary} />
+            <Text style={[styles.syncToastText, { color: c.onBrandTertiary }]}>{syncStatus}</Text>
+          </View>
+        )}
 
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.brandPrimary} />}
@@ -140,6 +218,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.lg },
   title: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
   regenBtn: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  syncToast: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: spacing.lg, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.sm },
+  syncToastText: { fontSize: 13, fontWeight: "600", flex: 1 },
   visionCard: { padding: spacing.lg, borderRadius: radius.lg, gap: 8, marginBottom: spacing.lg },
   visionLabel: { color: "rgba(255,255,255,0.85)", fontSize: 12, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   visionTitle: { color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: -0.3 },

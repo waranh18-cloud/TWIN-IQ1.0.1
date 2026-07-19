@@ -54,6 +54,7 @@ class User(BaseModel):
     productivity_score: int = 0
     focus_score: int = 0
     badges: List[str] = []
+    streak_freezes: int = 0
 
 
 class SessionRequest(BaseModel):
@@ -86,6 +87,12 @@ class DailyCheckinIn(BaseModel):
     distractions: Optional[str] = ""
     learning: Optional[str] = ""
     completed_tasks_ratio: float = 0.0  # 0-1
+
+
+class PomodoroSessionIn(BaseModel):
+    duration_min: int = 25
+    kind: str = "focus"  # focus | break
+    mission_id: Optional[str] = None
 
 
 # ---------- Auth Helpers ----------
@@ -154,6 +161,7 @@ async def create_session(payload: SessionRequest):
             "productivity_score": 0,
             "focus_score": 0,
             "badges": [],
+            "streak_freezes": 1,  # welcome freeze
         }
         await db.users.insert_one(user_doc)
 
@@ -371,6 +379,8 @@ async def dashboard(authorization: Optional[str] = Header(None)):
     total = len(missions)
     completion = round((completed / total) * 100) if total else 0
 
+    challenge = await _get_or_create_weekly_challenge(user["user_id"])
+
     return {
         "user": user,
         "today": today,
@@ -387,9 +397,11 @@ async def dashboard(authorization: Optional[str] = Header(None)):
             "xp": user.get("xp", 0),
             "level": user.get("level", 1),
             "streak": user.get("streak", 0),
+            "streak_freezes": int(user.get("streak_freezes", 0)),
             "productivity_score": user.get("productivity_score", 0),
             "focus_score": user.get("focus_score", 0),
         },
+        "challenge": challenge,
     }
 
 
@@ -431,10 +443,24 @@ async def complete_mission(payload: MissionComplete, authorization: Optional[str
     today = datetime.now(timezone.utc).date().isoformat()
     yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
     last_active = user.get("last_active_date")
+    freezes_used = 0
     if last_active == today:
         new_streak = user.get("streak", 0)
     elif last_active == yesterday:
         new_streak = user.get("streak", 0) + 1
+    elif last_active:
+        # Determine gap days; auto-consume freezes to preserve streak up to 2 days
+        try:
+            last_d = datetime.fromisoformat(last_active).date()
+            gap = (datetime.now(timezone.utc).date() - last_d).days - 1  # missed days
+        except Exception:
+            gap = 999
+        avail = int(user.get("streak_freezes", 0))
+        if 0 < gap <= avail and gap <= 2:
+            freezes_used = gap
+            new_streak = user.get("streak", 0) + 1
+        else:
+            new_streak = 1
     else:
         new_streak = 1
 
@@ -451,6 +477,11 @@ async def complete_mission(payload: MissionComplete, authorization: Optional[str
     if new_level >= 5 and "level_5" not in badges:
         badges.append("level_5")
 
+    # Grant 1 streak freeze on every level up (cap 5)
+    cur_freezes = int(user.get("streak_freezes", 0)) - freezes_used
+    if new_level > user.get("level", 1):
+        cur_freezes = min(5, cur_freezes + (new_level - user.get("level", 1)))
+
     await db.users.update_one(
         {"user_id": user["user_id"]},
         {"$set": {
@@ -459,11 +490,16 @@ async def complete_mission(payload: MissionComplete, authorization: Optional[str
             "streak": new_streak,
             "last_active_date": today,
             "badges": badges,
+            "streak_freezes": max(0, cur_freezes),
         }},
     )
+
+    # Update weekly challenge progress
+    await _update_weekly_challenge_progress(user["user_id"], missions_delta=1, xp_delta=xp_gain)
+
     updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
     m = await db.missions.find_one({"mission_id": payload.mission_id}, {"_id": 0})
-    return {"user": updated, "mission": m, "xp_gained": xp_gain}
+    return {"user": updated, "mission": m, "xp_gained": xp_gain, "freezes_used": freezes_used}
 
 
 # ---------- Daily Check-in ----------
@@ -527,6 +563,7 @@ Give a warm, insightful reflection with 1 concrete tip for tomorrow."""
         {"checkin_id": doc["checkin_id"]},
         {"$set": {"ai_insight": insight}},
     )
+    await _update_weekly_challenge_progress(user["user_id"], checkin_delta=1)
     return {"insight": insight, "checkin": {**doc, "ai_insight": insight}}
 
 
@@ -659,6 +696,179 @@ async def weekly_report(authorization: Optional[str] = Header(None)):
     }
 
 
+# ---------- Weekly Challenges ----------
+def _week_start_iso(d: Optional[datetime] = None) -> str:
+    d = d or datetime.now(timezone.utc)
+    # Monday as start of week
+    start = d.date() - timedelta(days=d.weekday())
+    return start.isoformat()
+
+
+WEEKLY_CHALLENGE_TEMPLATES = [
+    {"key": "missions_20", "title": "Consistency Champion", "desc": "Complete 20 missions this week",
+     "target_type": "missions", "target": 20, "reward_xp": 100, "icon": "trophy"},
+    {"key": "xp_300", "title": "XP Grinder", "desc": "Earn 300 XP this week",
+     "target_type": "xp", "target": 300, "reward_xp": 80, "icon": "flash"},
+    {"key": "focus_5", "title": "Focus Fortress", "desc": "Complete 5 focus sessions",
+     "target_type": "pomodoro", "target": 5, "reward_xp": 60, "icon": "eye"},
+    {"key": "checkin_5", "title": "Reflection Master", "desc": "Check-in 5 days this week",
+     "target_type": "checkins", "target": 5, "reward_xp": 70, "icon": "journal"},
+]
+
+
+async def _get_or_create_weekly_challenge(user_id: str) -> Dict[str, Any]:
+    week = _week_start_iso()
+    existing = await db.weekly_challenges.find_one(
+        {"user_id": user_id, "week_start": week}, {"_id": 0}
+    )
+    if existing:
+        return existing
+    # Pick template based on week hash for variety
+    idx = abs(hash(user_id + week)) % len(WEEKLY_CHALLENGE_TEMPLATES)
+    tpl = WEEKLY_CHALLENGE_TEMPLATES[idx]
+    doc = {
+        "challenge_id": f"{user_id}_{week}",
+        "user_id": user_id,
+        "week_start": week,
+        **tpl,
+        "progress": 0,
+        "completed": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    await db.weekly_challenges.update_one(
+        {"challenge_id": doc["challenge_id"]}, {"$set": doc}, upsert=True
+    )
+    return doc
+
+
+async def _update_weekly_challenge_progress(
+    user_id: str, missions_delta: int = 0, xp_delta: int = 0,
+    pomodoro_delta: int = 0, checkin_delta: int = 0,
+) -> None:
+    ch = await _get_or_create_weekly_challenge(user_id)
+    if ch.get("completed"):
+        return
+    delta_map = {
+        "missions": missions_delta,
+        "xp": xp_delta,
+        "pomodoro": pomodoro_delta,
+        "checkins": checkin_delta,
+    }
+    delta = int(delta_map.get(ch["target_type"], 0))
+    if delta <= 0:
+        return
+    new_progress = min(ch["target"], ch["progress"] + delta)
+    completed_now = new_progress >= ch["target"] and not ch.get("completed")
+    updates = {"progress": new_progress}
+    if completed_now:
+        updates["completed"] = True
+        updates["completed_at"] = datetime.now(timezone.utc)
+        # Award bonus XP
+        u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if u:
+            new_xp = u.get("xp", 0) + int(ch.get("reward_xp", 50))
+            new_level = _level_from_xp(new_xp)
+            badges = list(u.get("badges", []))
+            if "challenger" not in badges:
+                badges.append("challenger")
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$set": {"xp": new_xp, "level": new_level, "badges": badges}},
+            )
+    await db.weekly_challenges.update_one(
+        {"challenge_id": ch["challenge_id"]}, {"$set": updates}
+    )
+
+
+@api.get("/challenges/weekly")
+async def weekly_challenge(authorization: Optional[str] = Header(None)):
+    user = await get_user_from_token(authorization)
+    ch = await _get_or_create_weekly_challenge(user["user_id"])
+    return {"challenge": ch}
+
+
+# ---------- Streak Freeze ----------
+class UseFreezeIn(BaseModel):
+    pass
+
+
+@api.post("/streak/use-freeze")
+async def use_freeze(_: UseFreezeIn = UseFreezeIn(), authorization: Optional[str] = Header(None)):
+    user = await get_user_from_token(authorization)
+    freezes = int(user.get("streak_freezes", 0))
+    if freezes <= 0:
+        raise HTTPException(status_code=400, detail="No streak freezes available")
+    today = datetime.now(timezone.utc).date().isoformat()
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"streak_freezes": freezes - 1, "last_active_date": today}},
+    )
+    updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return {"user": updated, "freezes_remaining": freezes - 1}
+
+
+# ---------- Pomodoro ----------
+@api.post("/pomodoro/session")
+async def pomodoro_session(payload: PomodoroSessionIn, authorization: Optional[str] = Header(None)):
+    user = await get_user_from_token(authorization)
+    doc = {
+        "session_id": f"pomo_{uuid.uuid4().hex[:12]}",
+        "user_id": user["user_id"],
+        "duration_min": payload.duration_min,
+        "kind": payload.kind,
+        "mission_id": payload.mission_id,
+        "completed_at": datetime.now(timezone.utc),
+    }
+    await db.pomodoro_sessions.insert_one(dict(doc))
+    doc.pop("_id", None)
+
+    xp_gained = 0
+    if payload.kind == "focus":
+        # 1 XP per minute
+        xp_gained = max(5, payload.duration_min)
+        new_xp = user.get("xp", 0) + xp_gained
+        new_level = _level_from_xp(new_xp)
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"xp": new_xp, "level": new_level}},
+        )
+        await _update_weekly_challenge_progress(
+            user["user_id"], xp_delta=xp_gained, pomodoro_delta=1
+        )
+
+    updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return {"session": doc, "user": updated, "xp_gained": xp_gained}
+
+
+@api.get("/pomodoro/stats")
+async def pomodoro_stats(authorization: Optional[str] = Header(None)):
+    user = await get_user_from_token(authorization)
+    today = datetime.now(timezone.utc).date().isoformat()
+    week_start_dt = datetime.fromisoformat(_week_start_iso())
+    week_start_dt = week_start_dt.replace(tzinfo=timezone.utc)
+
+    today_sessions = await db.pomodoro_sessions.find(
+        {"user_id": user["user_id"], "kind": "focus",
+         "completed_at": {"$gte": datetime.combine(
+             datetime.now(timezone.utc).date(), datetime.min.time(), tzinfo=timezone.utc)}},
+        {"_id": 0},
+    ).to_list(200)
+    week_sessions = await db.pomodoro_sessions.find(
+        {"user_id": user["user_id"], "kind": "focus",
+         "completed_at": {"$gte": week_start_dt}},
+        {"_id": 0},
+    ).to_list(500)
+
+    return {
+        "today_count": len(today_sessions),
+        "today_minutes": sum(s.get("duration_min", 0) for s in today_sessions),
+        "week_count": len(week_sessions),
+        "week_minutes": sum(s.get("duration_min", 0) for s in week_sessions),
+    }
+
+
+
+
 # ---------- Startup ----------
 @app.on_event("startup")
 async def startup():
@@ -672,6 +882,9 @@ async def startup():
         await db.roadmaps.create_index([("user_id", 1), ("date", 1)])
         await db.checkins.create_index("checkin_id", unique=True)
         await db.coach_messages.create_index([("user_id", 1), ("created_at", 1)])
+        await db.weekly_challenges.create_index("challenge_id", unique=True)
+        await db.weekly_challenges.create_index([("user_id", 1), ("week_start", 1)])
+        await db.pomodoro_sessions.create_index([("user_id", 1), ("completed_at", -1)])
     except Exception as e:
         logger.warning(f"Index creation warning: {e}")
 

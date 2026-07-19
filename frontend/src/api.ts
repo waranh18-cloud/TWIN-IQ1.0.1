@@ -59,6 +59,11 @@ export const api = {
   coachHistory: () => req("GET", "/coach/history"),
   coachSend: (message: string) => req("POST", "/coach/message", { message }),
   weeklyReport: () => req("GET", "/reports/weekly"),
+  weeklyChallenge: () => req("GET", "/challenges/weekly"),
+  useFreeze: () => req("POST", "/streak/use-freeze", {}),
+  pomodoroSession: (duration_min: number, kind: "focus" | "break", mission_id?: string) =>
+    req("POST", "/pomodoro/session", { duration_min, kind, mission_id }),
+  pomodoroStats: () => req("GET", "/pomodoro/stats"),
 };
 
 export { getToken };

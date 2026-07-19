@@ -100,6 +100,12 @@ export default function Dashboard() {
                   <Ionicons name="trophy" size={14} color="#fff" />
                   <Text style={styles.pillText} testID="level-count">Level {stats.level}</Text>
                 </View>
+                {stats.streak_freezes > 0 && (
+                  <View style={styles.pill}>
+                    <Ionicons name="snow" size={14} color="#fff" />
+                    <Text style={styles.pillText} testID="freeze-count">{stats.streak_freezes}</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.heroMsg} testID="motivational-message">
                 {data.roadmap_summary?.motivational_message || "You've got this. Let's make today count."}
@@ -127,6 +133,47 @@ export default function Dashboard() {
             <ScoreCard label="Productivity" value={`${stats.productivity_score}%`} pct={stats.productivity_score / 100} icon="rocket" testID="score-productivity" />
           </View>
 
+          {/* Weekly Challenge card */}
+          {data.challenge && (
+            <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.xl }}>
+              <View style={[styles.challengeCard, { backgroundColor: c.surfaceSecondary, borderColor: c.border }]} testID="weekly-challenge">
+                <View style={styles.challengeHead}>
+                  <LinearGradient colors={gradients.sunrise as any} style={styles.challengeIcon}>
+                    <Ionicons name={data.challenge.icon || "trophy"} size={20} color="#fff" />
+                  </LinearGradient>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.challengeLabel, { color: c.warning }]}>WEEKLY CHALLENGE</Text>
+                    <Text style={[styles.challengeTitle, { color: c.onSurface }]}>{data.challenge.title}</Text>
+                  </View>
+                  <View style={styles.rewardBadge}>
+                    <Ionicons name="star" size={11} color={c.warning} />
+                    <Text style={[styles.rewardText, { color: c.warning }]}>+{data.challenge.reward_xp}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.challengeDesc, { color: c.onSurfaceSecondary }]}>
+                  {data.challenge.desc}
+                </Text>
+                <View style={{ marginTop: 10 }}>
+                  <ProgressBar
+                    value={data.challenge.target ? Math.min(1, data.challenge.progress / data.challenge.target) : 0}
+                    height={8}
+                    color={data.challenge.completed ? c.success : undefined}
+                  />
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+                    <Text style={[styles.challengeProg, { color: c.onSurfaceSecondary }]}>
+                      {data.challenge.progress} / {data.challenge.target}
+                    </Text>
+                    {data.challenge.completed && (
+                      <Text style={[styles.challengeProg, { color: c.success, fontWeight: "700" }]}>
+                        ✓ Complete!
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* Today's missions */}
           <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.xl }}>
             <View style={styles.sectionHeader}>
@@ -149,7 +196,28 @@ export default function Dashboard() {
           </View>
 
           {/* Daily Check-in CTA */}
-          <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.xl }}>
+          <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.xl, gap: spacing.md }}>
+            <Pressable onPress={() => router.push("/pomodoro")} testID="pomodoro-cta">
+              <LinearGradient
+                colors={gradients.brand as any}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.checkinCta}
+              >
+                <View style={styles.checkinIcon}>
+                  <View style={[styles.checkinIconInner, { backgroundColor: "rgba(255,255,255,0.25)" }]}>
+                    <Ionicons name="timer" size={22} color="#fff" />
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.checkinTitle, { color: "#fff" }]}>Start a Focus Session</Text>
+                  <Text style={[styles.checkinDesc, { color: "rgba(255,255,255,0.85)" }]}>
+                    25min Pomodoro. Earn XP per minute focused.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#fff" />
+              </LinearGradient>
+            </Pressable>
+
             <Pressable onPress={() => router.push("/checkin")} testID="daily-checkin-cta">
               <LinearGradient
                 colors={mode === "dark" ? ["#161821", "#1E1B4B"] : ["#EDE9FE", "#DBEAFE"]}
@@ -227,12 +295,20 @@ function MissionCard({ mission, loading, onComplete }: any) {
         </View>
       </View>
       {!done && (
-        <Pressable onPress={onComplete} disabled={loading}
-          testID={`complete-${mission.mission_id}`}
-          style={[styles.completeBtn, { borderColor: c.border }]}>
-          {loading ? <ActivityIndicator size="small" color={c.brandPrimary} /> :
-            <Ionicons name="checkmark" size={18} color={c.brandPrimary} />}
-        </Pressable>
+        <>
+          <Pressable
+            onPress={() => router.push({ pathname: "/pomodoro", params: { missionId: mission.mission_id, missionTitle: mission.title } })}
+            testID={`focus-${mission.mission_id}`}
+            style={[styles.completeBtn, { borderColor: c.border, marginRight: 6 }]}>
+            <Ionicons name="timer-outline" size={18} color={c.brandSecondary} />
+          </Pressable>
+          <Pressable onPress={onComplete} disabled={loading}
+            testID={`complete-${mission.mission_id}`}
+            style={[styles.completeBtn, { borderColor: c.border }]}>
+            {loading ? <ActivityIndicator size="small" color={c.brandPrimary} /> :
+              <Ionicons name="checkmark" size={18} color={c.brandPrimary} />}
+          </Pressable>
+        </>
       )}
     </View>
   );
@@ -279,4 +355,13 @@ const styles = StyleSheet.create({
   checkinIconInner: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   checkinTitle: { fontSize: 15, fontWeight: "700" },
   checkinDesc: { fontSize: 12, marginTop: 2 },
+  challengeCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  challengeHead: { flexDirection: "row", alignItems: "center", gap: 12 },
+  challengeIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  challengeLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 0.7 },
+  challengeTitle: { fontSize: 15, fontWeight: "800", marginTop: 2 },
+  rewardBadge: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(245,158,11,0.15)" },
+  rewardText: { fontSize: 11, fontWeight: "800" },
+  challengeDesc: { fontSize: 12, marginTop: 8 },
+  challengeProg: { fontSize: 11, fontWeight: "600" },
 });

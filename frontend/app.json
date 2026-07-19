@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.twiniqcoach.p7zd3z"
+      "bundleIdentifier": "com.emergent.twiniqcoach.p7zd3z",
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "Sync your Twin IQ missions to your calendar",
+        "NSCalendarsWriteOnlyAccessUsageDescription": "Add Twin IQ missions to your calendar",
+        "NSRemindersUsageDescription": "Save mission reminders to your device"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +23,8 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.twiniqcoach.p7zd3z"
+      "package": "com.emergent.twiniqcoach.p7zd3z",
+      "permissions": ["READ_CALENDAR", "WRITE_CALENDAR"]
     },
     "web": {
       "bundler": "metro",
@@ -34,6 +40,12 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Twin IQ needs access to sync your missions to your calendar."
         }
       ]
     ],
