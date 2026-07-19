@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend UI bug fix verified on AI Coach tab. Input field 'Ask your coach anything...' is visible at y=688-752, send button visible at y=704-752, tab bar (Home/Roadmap/Coach/Progress/Profile) fully visible with labels at y=805-819 in a 390x844 viewport — NO overlap between input and tab bar. Typed 'Hello', tapped send, and received a personalized Gemini AI response (~10s) that correctly referenced the seeded profile (streak, XP, hours). User and assistant chat bubbles render correctly. Tab bar labels are not clipped. FIXED a missing import (useSafeAreaInsets was used at coach.tsx line 24 but not imported from react-native-safe-area-context) which would have caused a runtime ReferenceError on the Coach screen — added the import to complete the fix. No red-screen errors or page errors during testing.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/tmp/coach_initial.png", "/tmp/after_send.png", "/tmp/final_chat.png", "/tmp/seed_session.py"],
+  "action_items": [
+    "None blocking. Verify on real Android device that bottomInset (Math.max(insets.bottom, 12)) is sufficient for gesture-nav devices — current emulated web viewport doesn't fully exercise Android nav bar case."
+  ],
+  "critical_code_review_comments": [
+    "coach.tsx originally used useSafeAreaInsets() at line 24 without importing it — this would have thrown ReferenceError on the Coach screen at runtime. Fixed by adding useSafeAreaInsets to the existing react-native-safe-area-context import.",
+    "tabBarHeight constant (60 + bottomInset) is duplicated between coach.tsx and _layout.tsx. Consider extracting to a shared constants/hook to avoid drift if either value changes."
+  ],
+  "updated_files": ["/app/frontend/app/(tabs)/coach.tsx"],
+  "success_rate": {"backend": "N/A (not tested this iteration)", "frontend": "100%"},
+  "seed_data_creation": "Seeded MongoDB user (user_test001) + session_token (test_token_abc123) with 7-day expiry via /tmp/seed_session.py using env MONGO_URL/DB_NAME. Profile has streak=2, xp=50, subjects=Math, hours=3-4 hrs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "To test authenticated screens, run /tmp/seed_session.py then set localStorage.twiniq_session_token='test_token_abc123' before navigating to /(tabs)/*. EXPO_PUBLIC_BACKEND_URL is used (not EXPO_BACKEND_URL) in this app. Coach screen is at /coach after redirect from /(tabs)/coach.",
+  "rca_of_issue": "Original bug: floating tab bar (position:absolute) covered the coach input. Fix uses useSafeAreaInsets() to compute tabBarHeight = 60 + bottomInset and applies paddingBottom = tabBarHeight + 12 to the input area — verified working. However, the fix introduced a missing-import bug (useSafeAreaInsets not imported) which I patched. Post-fix screenshots confirm input sits ~20px above the tab bar and tab bar labels are within the viewport."
+}

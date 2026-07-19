@@ -3,10 +3,16 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View, StyleSheet, Platform } from "react-native";
 import { BlurView } from "expo-blur";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePalette } from "@/src/theme";
 
 export default function TabsLayout() {
   const { c, mode } = usePalette();
+  const insets = useSafeAreaInsets();
+  // Ensure a visible resting area at the bottom on all Android/iOS devices
+  const bottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 12 : 20);
+  const tabBarHeight = 60 + bottomInset;
+
   return (
     <Tabs
       screenOptions={{
@@ -18,15 +24,24 @@ export default function TabsLayout() {
           borderTopWidth: 0,
           backgroundColor: "transparent",
           elevation: 0,
-          height: Platform.OS === "ios" ? 84 : 70,
-          paddingBottom: Platform.OS === "ios" ? 24 : 12,
-          paddingTop: 10,
+          height: tabBarHeight,
+          paddingBottom: bottomInset,
+          paddingTop: 8,
         },
         tabBarBackground: () => (
           <BlurView
             tint={mode === "dark" ? "dark" : "light"}
             intensity={mode === "dark" ? 60 : 80}
-            style={[StyleSheet.absoluteFill, { borderTopWidth: 1, borderTopColor: c.glassBorder }]}
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                borderTopWidth: 1,
+                borderTopColor: c.glassBorder,
+                backgroundColor: mode === "dark"
+                  ? "rgba(11,12,16,0.85)"
+                  : "rgba(255,255,255,0.9)",
+              },
+            ]}
           />
         ),
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },

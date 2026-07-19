@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput, Pressable, KeyboardAvoidingView,
   Platform, ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { api } from "@/src/api";
@@ -21,6 +21,9 @@ type Msg = { role: "user" | "assistant"; text: string; message_id?: string };
 
 export default function Coach() {
   const { c, mode } = usePalette();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 12 : 20);
+  const tabBarHeight = 60 + bottomInset; // must match _layout.tsx
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -69,8 +72,16 @@ export default function Coach() {
           </View>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
-          <ScrollView ref={scrollRef} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }} testID="coach-scroll">
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        >
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.md }}
+            testID="coach-scroll"
+          >
             {loadingHistory ? (
               <ActivityIndicator color={c.brandPrimary} />
             ) : messages.length === 0 ? (
@@ -123,7 +134,11 @@ export default function Coach() {
             )}
           </ScrollView>
 
-          <View style={[styles.inputArea, { backgroundColor: c.surface, borderTopColor: c.divider }]}>
+          <View style={[styles.inputArea, {
+            backgroundColor: c.surface,
+            borderTopColor: c.divider,
+            paddingBottom: tabBarHeight + 12,
+          }]}>
             <View style={styles.inputRow}>
               <TextInput
                 testID="coach-input"
@@ -172,7 +187,7 @@ const styles = StyleSheet.create({
   msgRow: { flexDirection: "row", marginBottom: spacing.md, alignItems: "flex-end", gap: 8 },
   msgAvatar: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   bubble: { maxWidth: "82%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: "transparent" },
-  inputArea: { borderTopWidth: 1, paddingTop: spacing.sm, paddingBottom: Platform.OS === "ios" ? spacing.xl : spacing.md },
+  inputArea: { borderTopWidth: 1, paddingTop: spacing.sm },
   inputRow: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: spacing.lg, gap: spacing.sm },
   input: { flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 24, borderWidth: 1, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14, fontSize: 15 },
   sendBtn: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
